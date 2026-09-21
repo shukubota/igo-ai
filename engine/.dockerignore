@@ -1,0 +1,14 @@
+# ローカルの venv（200MB超）。イメージでは requirements.txt から入れ直すので不要。
+.venv/
+venv/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 実行時には使わない
+tests/
+scripts/
+deploy.sh
+
+# models/ は除外しない。Dockerfile が model.onnx を COPY するため。

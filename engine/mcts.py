@@ -58,8 +58,9 @@ class MCTS:
         for b in boards:
             bi, gi = F.encode(b, komi=self.komi)
             bins.append(bi[0]); globs.append(gi[0])
-        bin_in = np.stack(bins).astype(np.float32)
-        glob_in = np.stack(globs).astype(np.float32)
+        dt = F.input_dtype(self.sess)
+        bin_in = np.stack(bins).astype(dt, copy=False)
+        glob_in = np.stack(globs).astype(dt, copy=False)
 
         out = self.sess.run(None, {"bin_input": bin_in, "global_input": glob_in})
         names = [o.name for o in self.sess.get_outputs()]

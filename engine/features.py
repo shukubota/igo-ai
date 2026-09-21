@@ -73,6 +73,21 @@ def _liberty_planes(board: Board, out: np.ndarray) -> None:
                 out[ch, q] = 1.0
 
 
+# ONNX が申告する型 → numpy 型。fp16 版のモデルは内部演算だけでなく I/O も
+# float16 で、float32 を渡すと InvalidArgument で落ちる。Cloud Run では fp32、
+# Mac では fp16 を使い分けるので、モデル側の申告に合わせて都度キャストする。
+_ORT_TO_NUMPY = {
+    "tensor(float)": np.float32,
+    "tensor(float16)": np.float16,
+    "tensor(double)": np.float64,
+}
+
+
+def input_dtype(sess) -> np.dtype:
+    """セッションが要求する bin_input の dtype を返す。"""
+    return np.dtype(_ORT_TO_NUMPY.get(sess.get_inputs()[0].type, np.float32))
+
+
 def encode(board: Board, *, komi: float = 7.5, rules: str = "chinese") -> tuple[np.ndarray, np.ndarray]:
     """盤面を (bin_input[1,22,H,W], global_input[1,19]) に変換する。"""
     s = board.size

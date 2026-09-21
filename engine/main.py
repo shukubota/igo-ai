@@ -77,8 +77,10 @@ class Position(BaseModel):
 def _run(board: Board, komi: float):
     sess = get_session()
     bin_in, glob_in = F.encode(board, komi=komi)
+    dt = F.input_dtype(sess)
     t = time.perf_counter()
-    out = sess.run(None, {"bin_input": bin_in, "global_input": glob_in})
+    out = sess.run(None, {"bin_input": bin_in.astype(dt, copy=False),
+                          "global_input": glob_in.astype(dt, copy=False)})
     ms = (time.perf_counter() - t) * 1000.0
     names = [o.name for o in sess.get_outputs()]
     return dict(zip(names, out)), ms
@@ -145,7 +147,7 @@ def genmove(pos: Position):
         p /= p.sum()
         move = int(np.random.choice(len(p), p=p))
 
-    value = np.asarray(res["value"])[0]
+    value = np.asarray(res["value"])[0].astype(np.float64)
     e = np.exp(value - value.max()); wld = e / e.sum()
 
     body = {
@@ -174,7 +176,7 @@ def analyze(pos: Position):
     """勝率・地の所有権を返す（解説機能用）。"""
     board = Board.from_dict(pos.model_dump())
     res, ms = _run(board, pos.komi)
-    value = np.asarray(res["value"])[0]
+    value = np.asarray(res["value"])[0].astype(np.float64)
     e = np.exp(value - value.max()); wld = e / e.sum()
     body = {
         "winrate": float(wld[0]),
@@ -182,5 +184,6 @@ def analyze(pos: Position):
         "inference_ms": round(ms, 1),
     }
     if "ownership" in res:
-        body["ownership"] = np.asarray(res["ownership"])[0, 0].reshape(-1).round(3).tolist()
+        body["ownership"] = (np.asarray(res["ownership"])[0, 0]
+                             .astype(np.float64).reshape(-1).round(3).tolist())
     return body

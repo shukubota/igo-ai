@@ -4,7 +4,13 @@ import { genmove } from './api/client';
 import { createPosition, tryPlay, pass, toGtp, type Position } from './goban/rules';
 import { PASS, BLACK, toBlackWinrate, type GenmoveResponse } from './types';
 
-const SIZE = 19;
+const SIZES = [13, 19] as const;
+type Size = (typeof SIZES)[number];
+const DEFAULT_SIZE: Size = 13;
+
+// 日本ルールのコミ。features.py は rules="chinese" で符号化しているので、
+// 中国ルールに合わせるなら 7.5 にする（碁の数え方が違うぶん 1 目ずれる）。
+const KOMI = 6.5;
 
 /**
  * 対局画面。
@@ -13,7 +19,8 @@ const SIZE = 19;
  * SPEC_UI.md の Phase U1 以降で rules.ts / 検討機能 / 棋譜を足していく。
  */
 export default function App() {
-  const [pos, setPos] = useState<Position>(() => createPosition(SIZE));
+  const [size, setSize] = useState<Size>(DEFAULT_SIZE);
+  const [pos, setPos] = useState<Position>(() => createPosition(DEFAULT_SIZE));
   const [history, setHistory] = useState<number[]>([]);
   const [snapshots, setSnapshots] = useState<Array<{ pos: Position; history: number[] }>>([]);
   const [thinking, setThinking] = useState(false);
@@ -36,7 +43,7 @@ export default function App() {
         to_move: p.toMove,
         history: h.slice(-5),
         ko: p.ko,
-        komi: 7.5,
+        komi: KOMI,
         visits,
         max_time_ms: 30_000,
         c_puct: 1.4,
@@ -89,7 +96,16 @@ export default function App() {
 
   const handleReset = () => {
     abort.current?.abort();
-    setPos(createPosition(SIZE)); setHistory([]); setSnapshots([]);
+    setPos(createPosition(size)); setHistory([]); setSnapshots([]);
+    setLast(null); setError(null);
+  };
+
+  // 盤サイズを変えると局面の意味が変わるので、対局をまるごと作り直す。
+  const handleSizeChange = (next: Size) => {
+    if (thinking) return;
+    abort.current?.abort();
+    setSize(next);
+    setPos(createPosition(next)); setHistory([]); setSnapshots([]);
     setLast(null); setError(null);
   };
 
@@ -105,7 +121,7 @@ export default function App() {
 
       <div className="layout">
         <div className="board-col">
-          <Board size={SIZE} stones={pos.stones} lastMove={lastMove}
+          <Board size={size} stones={pos.stones} lastMove={lastMove}
                  onPlay={handlePlay} disabled={thinking || pos.toMove !== BLACK} />
         </div>
 
@@ -113,6 +129,14 @@ export default function App() {
           <div className="panel">
             <label>黒の勝率 {(blackWinrate * 100).toFixed(1)}%</label>
             <div className="wr"><div style={{ width: `${blackWinrate * 100}%` }} /></div>
+          </div>
+
+          <div className="panel">
+            <label htmlFor="size">盤サイズ</label>
+            <select id="size" value={size} disabled={thinking}
+                    onChange={(e) => handleSizeChange(Number(e.target.value) as Size)}>
+              {SIZES.map((s) => <option key={s} value={s}>{s} 路</option>)}
+            </select>
           </div>
 
           <div className="panel">
@@ -148,7 +172,7 @@ export default function App() {
             <label>棋譜</label>
             <ol>
               {history.map((m, i) => (
-                <li key={i}>{m === PASS ? 'パス' : toGtp(SIZE, m)}</li>
+                <li key={i}>{m === PASS ? 'パス' : toGtp(size, m)}</li>
               ))}
             </ol>
           </div>

@@ -16,6 +16,22 @@ interface Props {
  * 責務は「盤面配列を受けて描く」と「クリック座標を index に変換する」だけ。
  * ルール判定は持たない（goban/rules.ts の担当）。
  */
+/**
+ * 星の位置（行, 列）。0-indexed。
+ *
+ * 19路は 3/9/15 の9点だが、13路・9路は隅4点＋天元の5点で、
+ * 19路と同じ総当たりで描くと存在しない星を描いてしまう。
+ */
+function hoshi(size: number): Array<[number, number]> {
+  if (size === 19) {
+    const xs = [3, 9, 15];
+    return xs.flatMap((r) => xs.map((c) => [r, c] as [number, number]));
+  }
+  if (size === 13) return [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]];
+  if (size === 9) return [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]];
+  return [];
+}
+
 export function Board({ size, stones, lastMove, onPlay, disabled }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -50,13 +66,11 @@ export function Board({ size, stones, lastMove, onPlay, disabled }: Props) {
       }
 
       // 星
-      if (size === 19) {
-        ctx.fillStyle = '#4a3a1a';
-        for (const r of [3, 9, 15]) for (const c of [3, 9, 15]) {
-          ctx.beginPath();
-          ctx.arc(pad + c * gap, pad + r * gap, Math.max(1.8, css / 230), 0, Math.PI * 2);
-          ctx.fill();
-        }
+      ctx.fillStyle = '#4a3a1a';
+      for (const [r, c] of hoshi(size)) {
+        ctx.beginPath();
+        ctx.arc(pad + c * gap, pad + r * gap, Math.max(1.8, css / 230), 0, Math.PI * 2);
+        ctx.fill();
       }
 
       // 石

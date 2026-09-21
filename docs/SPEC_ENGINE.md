@@ -21,7 +21,7 @@ CPU上でKataGoのニューラルネットを動かし、MCTS探索つきで着�
 | ONNX入力名/shape | `bin_input [B,22,H,W]`, `global_input [B,19]` | kaya-go/kaya の README |
 | ONNX出力名/shape | `policy [B,2,362]`, `value [B,3]`, `ownership [B,1,H,W]`, ほか6種 | 同上 |
 | policy末尾index | `361` = パス | 同上 |
-| ライセンス | MIT（KataGo重み・ONNX変換とも） | 同上 |
+| ライセンス | 重みは KataGo Neural Network License（MIT と同文言・別許諾）、ONNX変換版はモデルカード上 MIT | katagotraining.org/network_license/ / HFモデルカード |
 | 合法手判定の高速化 | 全点flood fill 1.03ms → 高速版 0.05ms（**21倍**）、出力完全一致 | 実測 |
 | MCTSのPython実装コスト | **0.3 ms/visit**。推論時間に対して無視できる | 実測（推論スタブ） |
 | CPU演算性能 | 2 vCPU / AVX-512 で fp32 GEMM **350 GFLOPS** | 実測 |
@@ -417,10 +417,16 @@ GitHub は1ファイル100MBがハードリミットで294MBは push が弾か�
 
 | 対象 | URL |
 |---|---|
-| モデル（ONNX, MIT） | https://huggingface.co/kaya-go/kaya |
+| モデル（ONNX） | https://huggingface.co/kaya-go/kaya |
+| 重みのライセンス原文 | https://katagotraining.org/network_license/ |
 | ONNX変換ツール | https://github.com/kaya-go/katago-onnx |
 | KataGo本家（特徴量の一次情報） | https://github.com/lightvector/KataGo |
 | KataGo論文 | https://arxiv.org/abs/1902.10565 |
 | Cloud Run カスタムコンテナ | https://cloud.google.com/run/docs/deploying |
 
-**ライセンス**: KataGoの重みおよびONNX変換版は MIT License。
+**ライセンス**: 重みは KataGo の **Neural Network License**（本文は MIT と同一だが、コードの
+LICENSE とは別の許諾。本家 LICENSE は "content in this repo" が対象で、重みは含まれない）。
+ONNX変換版はモデルカード上 MIT。
+
+変換ツール `kaya-go/katago-onnx` 自体は AGPL-3.0 で、モデルカードの MIT 表記と食い違う
+（2026-09-22 確認）。本プロジェクトは .onnx 成果物のみを使いツールのソースは取り込まない。

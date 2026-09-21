@@ -32,7 +32,7 @@ clone 直後はこのファイルが無い。エンジンが起動しない場�
 | policy の末尾 index | `361` = パス |
 | パラメータ数 | 約 73M（b28c512nbt） |
 | ファイルサイズ | fp32 294MB / fp16 147MB / uint8 74MB |
-| ライセンス | MIT |
+| ライセンス | コードは MIT。**重みは KataGo Neural Network License**（MIT と同文言だがコードとは別の許諾）。詳細は README のライセンス節 |
 
 ## 測ってある数値（推測で置き換えないこと）
 

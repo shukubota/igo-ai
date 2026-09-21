@@ -1,6 +1,6 @@
 # igo-ai
 
-KataGo のニューラルネット（ONNX / MIT）を使った囲碁の対局・解析アプリ。
+KataGo のニューラルネット（ONNX）を使った囲碁の対局・解析アプリ。
 
 - `engine/` — Python の推論サーバー。FastAPI + ONNX Runtime + 自前の MCTS
 - `web/` — Vite + React + TypeScript の対局 UI
@@ -55,5 +55,15 @@ clone しただけでは動かない。必ずこれを実行する。
 
 ## ライセンス
 
-コードは MIT。KataGo の重みおよび
-[kaya-go/kaya](https://huggingface.co/kaya-go/kaya) の ONNX 変換版も MIT。
+コードは MIT（[LICENSE](LICENSE)）。
+
+利用している第三者の成果物:
+
+| 対象 | ライセンス |
+|---|---|
+| [KataGo](https://github.com/lightvector/KataGo)（David J. Wu / lightvector） | MIT |
+| KataGo の学習済みネット（kata1 run） | [KataGo Neural Network License](https://katagotraining.org/network_license/) |
+| [kaya-go/kaya](https://huggingface.co/kaya-go/kaya)（ONNX 変換版） | MIT |
+
+重みは KataGo 本体のコードとは別のライセンスで提供されている点に注意
+（本家リポジトリの LICENSE は "content in this repo" が対象で、重みは含まれない）。

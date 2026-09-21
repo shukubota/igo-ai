@@ -18,9 +18,10 @@ CPU上でKataGoのニューラルネットを動かし、MCTS探索つきで着�
 
 | 項目 | 内容 | 根拠 |
 |---|---|---|
-| ONNX入力名/shape | `bin_input [B,22,H,W]`, `global_input [B,19]` | kaya-go/kaya の README |
-| ONNX出力名/shape | `policy [B,2,362]`, `value [B,3]`, `ownership [B,1,H,W]`, ほか6種 | 同上 |
-| policy末尾index | `361` = パス | 同上 |
+| ONNX入力名/shape | `bin_input [B,22,H,W]`, `global_input [B,19]`。dtype はモデル依存（fp16版は float16） | 実測 |
+| ONNX出力名/shape | `policy [B,6,H*W+1]`, `value [B,3]`, `ownership [B,1,H,W]`, 名前付き9種＋無名9種 | 実測 |
+| policy末尾index | `H*W` = パス。ch0 が通常の policy | 実測 |
+| 盤サイズ | H/W は動的。13路で動作確認済み | 実測 |
 | ライセンス | 重みは KataGo Neural Network License（MIT と同文言・別許諾）、ONNX変換版はモデルカード上 MIT | katagotraining.org/network_license/ / HFモデルカード |
 | 合法手判定の高速化 | 全点flood fill 1.03ms → 高速版 0.05ms（**21倍**）、出力完全一致 | 実測 |
 | MCTSのPython実装コスト | **0.3 ms/visit**。推論時間に対して無視できる | 実測（推論スタブ） |

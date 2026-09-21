@@ -27,9 +27,11 @@ clone 直後はこのファイルが無い。エンジンが起動しない場�
 
 | 項目 | 値 |
 |---|---|
-| ONNX 入力 | `bin_input [B,22,H,W]`, `global_input [B,19]`（ともに float32） |
-| ONNX 出力 | `policy [B,2,362]`, `value [B,3]`, `ownership [B,1,H,W]` ほか |
-| policy の末尾 index | `361` = パス |
+| ONNX 入力 | `bin_input [B,22,H,W]`, `global_input [B,19]`。**dtype はモデル依存**（fp16 版は float16、fp32 版は float32）。`features.input_dtype(sess)` で合わせる |
+| ONNX 出力 | `policy [B,6,H*W+1]`, `value [B,3]`, `ownership [B,1,H,W]` ほか。名前付き9種＋無名9種 |
+| policy の ch | **6ch ある**。ch0 が通常の policy（19路・13路とも初手が星になることを確認済み）。残り5chの意味は未確認 |
+| policy の末尾 index | `H*W` = パス（19路なら 361） |
+| 盤サイズ | H/W は動的。**13路も動く**（初手は D4/D10/K4/K10 の星） |
 | パラメータ数 | 約 73M（b28c512nbt） |
 | ファイルサイズ | fp32 294MB / fp16 147MB / uint8 74MB |
 | ライセンス | コードは MIT。**重みは KataGo Neural Network License**（MIT と同文言だがコードとは別の許諾）。詳細は README のライセンス節 |
@@ -39,6 +41,10 @@ clone 直後はこのファイルが無い。エンジンが起動しない場�
 - 合法手マスク: `legal_mask()` 0.05ms、素朴な全点flood fill 1.03ms（**21倍差**）
 - MCTS の Python 実装コスト: **0.3 ms/visit**。ボトルネックは推論であって Python ではない
 - CPU 演算性能: 2 vCPU / AVX-512 で fp32 GEMM 350 GFLOPS
+- Mac (M系, fp16, CPUExecutionProvider, 8スレッド) の推論: **19路 106ms / 13路 62ms**。
+  CoreML EP は未計測
+- **空盤の勝率が黒 0.20〜0.30 と低すぎる**（互角のはず）。policy は正常なので
+  `global_input` の19要素かvalueの解釈が疑わしい。未解決
 - **CPU はバッチ1でコアが飽和する**ので、バッチ化の利得は 1.3 倍程度。
   GPU のように 8 倍にはならない
 
@@ -67,8 +73,11 @@ clone 直後はこのファイルが無い。エンジンが起動しない場�
 ## やらないこと
 
 GPU 対応、探索木の再利用、Dirichlet ノイズ、自己対局学習、
-9路・13路の検証、Gemini 連携の解説機能。
+9路の検証、Gemini 連携の解説機能。
 必要になったら `docs/SPEC_ENGINE.md` の「将来の拡張」から拾う。
+
+13路は方針変更して対応済み（UI の既定も13路）。19路より推論が速く
+（19路 106ms / 13路 62ms、fp16・CPU・8スレッド実測）、判断もはっきり出る。
 
 ## コミット
 

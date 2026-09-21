@@ -23,6 +23,20 @@ MODEL_PATH=$PWD/models/model.onnx uvicorn main:app --port 8080
 cd web && npm install && npm run dev
 ```
 
+## モデルファイルについて
+
+`engine/models/model.onnx` は **ディスク上に必須**（無いとエンジンが起動しない）。
+`.gitignore` しているのは「git で追跡しない」という意味だけで、置かなくていい
+わけではない。GitHub の1ファイル100MB上限に引っかかるため追跡しないだけ。
+
+```bash
+cd engine
+./scripts/fetch_model.sh          # fp16（Mac / CoreML 向け・既定）
+./scripts/fetch_model.sh fp32     # Cloud Run / CPU 向け
+```
+
+clone しただけでは動かない。必ずこれを実行する。
+
 ## ⚠️ 最初にやること
 
 `engine/features.py` の 22ch の対応が未検証。ここがズレていると
@@ -37,7 +51,7 @@ cd web && npm install && npm run dev
 |---|---|
 | [docs/SPEC_ENGINE.md](docs/SPEC_ENGINE.md) | エンジン側の仕様・実装フェーズ・API 仕様・性能目標 |
 | [docs/SPEC_UI.md](docs/SPEC_UI.md) | UI 側の仕様・画面構成・状態設計・実装フェーズ |
-| [CLAUDE.md](CLAUDE.md) | Claude Code 向けのプロジェクト指示 |
+| [AGENTS.md](AGENTS.md) | Claude Code 向けのプロジェクト指示 |
 
 ## ライセンス
 

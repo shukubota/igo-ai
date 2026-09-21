@@ -66,7 +66,7 @@ Cloud Run  2 vCPU / 4GiB / min-instances=0 / timeout 60s
 
 ```
 igo-ai/
-├── CLAUDE.md                  Claude Code 向けのプロジェクト指示
+├── AGENTS.md                  Claude Code 向けのプロジェクト指示
 ├── docs/
 │   ├── SPEC_ENGINE.md         このファイル
 │   └── SPEC_UI.md             UI 側の仕様

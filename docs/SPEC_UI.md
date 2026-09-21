@@ -248,5 +248,5 @@ SGF は左上原点で、内部表現と同じ向き。
 ## 8. 参照
 
 - エンジン側の仕様: `docs/SPEC_ENGINE.md`
-- プロジェクト指示: `CLAUDE.md`
+- プロジェクト指示: `AGENTS.md`
 - SGF 仕様: https://www.red-bean.com/sgf/

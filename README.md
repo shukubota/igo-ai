@@ -10,17 +10,37 @@ KataGo のニューラルネット（ONNX）を使った囲碁の対局・解析
 
 ```bash
 # 1. モデルを取得（約147MB / fp16。Mac なら CoreML 用に fp16 を使う）
-cd engine && ./scripts/fetch_model.sh
+cd engine && ./scripts/fetch_model.sh && cd ..
 
-# 2. 実機のレイテンシを実測（features.py の前提と合っているかも確認できる）
-python3 scripts/inspect_model.py models/model.onnx 8
+# 2. エンジン起動（Docker）。healthy になるまで待つ
+docker compose up -d --wait
 
-# 3. エンジン起動
-pip install -r requirements.txt
-MODEL_PATH=$PWD/models/model.onnx uvicorn main:app --port 8080
-
-# 4. UI 起動（別ターミナル）
+# 3. UI 起動（別ターミナル）。UI は Docker に載せずホストで動かす
 cd web && npm install && npm run dev
+```
+
+http://localhost:5173 を開く。既定は13路。
+
+```bash
+docker compose logs -f engine   # エンジンのログ
+docker compose down             # 停止
+
+# 実機のレイテンシを実測（features.py の前提と合っているかも確認できる）
+docker compose exec engine python scripts/inspect_model.py /models/model.onnx 4
+```
+
+### エンジンをホストで直接動かす場合
+
+macOS では Docker が VM を挟むぶん遅い（**実測でコンテナ 299ms / ホスト 62ms**、
+1手あたり）。エンジンを触りながら強さを見るときはこちらが快適。
+
+```bash
+cd engine
+python3.12 -m venv .venv          # onnxruntime は 3.14 の wheel が無い
+.venv/bin/pip install -r requirements.txt
+MODEL_PATH=$PWD/models/model.onnx ORT_THREADS=8 \
+  .venv/bin/python -m uvicorn main:app --port 8080 --reload \
+  --reload-exclude '.venv/*' --reload-exclude 'models/*'
 ```
 
 ## モデルファイルについて

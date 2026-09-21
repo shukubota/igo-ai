@@ -1,0 +1,40 @@
+# ローカル開発用。エンジン（推論サーバー）だけを Docker で動かす。
+#
+# UI は Docker に載せない。ホストの Mac で `cd web && npm run dev` を使う。
+# Linux コンテナに node_modules を作り直す必要がなく、HMR も速いため。
+# UI の本番は Vercel、エンジンの本番は Cloud Run（engine/deploy.sh）。
+#
+#   docker compose up -d --wait     起動（healthy になるまで待つ）
+#   docker compose logs -f engine   ログ
+#   docker compose down             停止
+
+services:
+  engine:
+    build:
+      context: ./engine
+    image: igo-ai-engine:dev
+    ports:
+      - "8080:8080"
+    environment:
+      # コンテナに割り当てた CPU 数に合わせる。過剰なスレッドはむしろ遅くなる。
+      ORT_THREADS: "4"
+      # ホストの Vite（:5173）から叩くため。本番は Vercel のドメインに絞る。
+      ALLOW_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      MODEL_PATH: /models/model.onnx
+    volumes:
+      # モデルはイメージにも焼き込まれているが、fp16 / fp32 を差し替えたときに
+      # 再ビルドせず済むようホスト側のファイルで上書きする。
+      - ./engine/models/model.onnx:/models/model.onnx:ro
+      # ソースを上書きして --reload を効かせる。
+      - ./engine:/app
+    # .venv と models は監視対象から外す。230MB の venv を reload が舐めると
+    # 起動が遅くなるうえ、ファイル監視の上限に当たることがある。
+    command: >
+      uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+      --reload-exclude '.venv/*' --reload-exclude 'models/*'
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s

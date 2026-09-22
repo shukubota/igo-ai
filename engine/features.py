@@ -24,6 +24,7 @@ fillRowV7 出力とバイト一致することを確認すること。
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 from __future__ import annotations
+import math
 import numpy as np
 from goban import Board, EMPTY, BLACK, WHITE, PASS, opponent
 
@@ -115,11 +116,57 @@ def encode(board: Board, *, komi: float = 7.5, rules: str = "chinese") -> tuple[
     bin_input = flat.reshape(1, NUM_BIN, s, s)
 
     g = np.zeros((1, NUM_GLOBAL), dtype=np.float32)
-    # global もKataGo本家の並びに合わせる必要あり。最低限コミだけ入れる。
-    # KataGoではコミは (komi / 15.0) を手番視点で符号反転して渡す。
-    signed_komi = komi if me == WHITE else -komi
-    g[0, 5] = signed_komi / 15.0
+    _fill_global(g[0], board, komi=komi, rules=rules)
     return bin_input, g
+
+
+def _komi_parity_wave(self_komi: float, area: int) -> float:
+    """rowGlobal[18]。コミと盤面積のパリティを三角波で渡す。
+
+    地の計算では「引き分けになりうるコミ」のパリティで1目の価値が変わる。
+    ネットには学習しづらい xor 的な性質なので、本家は入力として直接与えている。
+    nninputs.cpp の同名の処理をそのまま移植。
+    """
+    drawable_komis_are_even = (area % 2 == 0)
+    if drawable_komis_are_even:
+        komi_floor = math.floor(self_komi / 2.0) * 2.0
+    else:
+        komi_floor = math.floor((self_komi - 1.0) / 2.0) * 2.0 + 1.0
+    delta = min(2.0, max(0.0, self_komi - komi_floor))
+    if delta < 0.5:
+        return delta
+    if delta < 1.5:
+        return 1.0 - delta
+    return delta - 2.0
+
+
+def _fill_global(g: np.ndarray, board: Board, *, komi: float, rules: str) -> None:
+    """global_input[19] を埋める。KataGo の fillRowV7 の rowGlobal 部分の移植。
+
+    中国ルール（ko=simple / scoring=area / tax=none / 自殺禁止）では index
+    6..13 と 15..17 はすべて 0 になるので、埋めるのは 0..5, 14, 18 だけでよい。
+    """
+    # 0..4: 直近5手がパスだったか（最新が index 0）
+    for i, mv in enumerate(reversed(board.history[-5:])):
+        if mv == PASS and i < 5:
+            g[i] = 1.0
+
+    # 5: 手番視点のコミ。本家は 20.0 で割る（15.0 ではない）。
+    #    ここを間違えると value ヘッドが壊れる。13路の空盤で実測したところ、
+    #    /15 だと黒 0.151、/20 だと黒 0.487（互角）になった。
+    self_komi = komi if board.to_move == WHITE else -komi
+    area = board.n
+    bound = area + 20.0
+    self_komi = max(-bound, min(bound, self_komi))
+    g[5] = self_komi / 20.0
+
+    # 14: いまパスすると局面が終わるか（＝直前もパスか）
+    if board.history and board.history[-1] == PASS:
+        g[14] = 1.0
+
+    # 18: コミのパリティ。地の計算（area scoring）のときだけ立つ。
+    if rules != "territory":
+        g[18] = _komi_parity_wave(self_komi, area)
 
 
 def softmax_masked(logits: np.ndarray, legal: np.ndarray) -> np.ndarray:

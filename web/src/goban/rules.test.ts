@@ -4,7 +4,7 @@
  * ⚠️ engine/tests/test_goban.py と同じケースを維持すること。
  */
 import { describe, it, expect } from 'vitest';
-import { createPosition, tryPlay, isLegal, pass, toGtp } from './rules';
+import { createPosition, tryPlay, isLegal, pass, toGtp, score, groupAt } from './rules';
 import { BLACK, WHITE, EMPTY, PASS } from '../types';
 
 describe('取り', () => {
@@ -78,5 +78,76 @@ describe('GTP座標', () => {
     expect(toGtp(19, 0)).toBe('A19');
     expect(toGtp(19, 180)).toBe('K10');
     expect(toGtp(19, PASS)).toBe('pass');
+  });
+});
+
+describe('地の計算（中国ルール）', () => {
+  /** 5路盤を縦に二分する。左2列が黒、右2列が白、中央列が境界。 */
+  const split = () => {
+    const p = createPosition(5);
+    for (let r = 0; r < 5; r++) {
+      p.stones[r * 5 + 2] = BLACK;   // 黒の壁
+      p.stones[r * 5 + 3] = WHITE;   // 白の壁
+    }
+    return p;
+  };
+
+  it('石と囲った空点を足す', () => {
+    const s = score(split(), 0, new Set());
+    // 黒: 壁5 + 左の空点10 = 15、白: 壁5 + 右の空点5 = 10
+    expect(s.black).toBe(15);
+    expect(s.white).toBe(10);
+    expect(s.diff).toBe(5);
+    expect(s.winner).toBe(BLACK);
+  });
+
+  it('コミで勝敗がひっくり返る', () => {
+    expect(score(split(), 6.5, new Set()).winner).toBe(WHITE);
+    expect(score(split(), 4.5, new Set()).winner).toBe(BLACK);
+  });
+
+  it('ちょうど差がゼロなら持碁', () => {
+    expect(score(split(), 5, new Set()).winner).toBe(null);
+  });
+
+  it('死石を指定すると相手の地になる', () => {
+    const p = split();
+    const dead = new Set([0 * 5 + 3, 1 * 5 + 3, 2 * 5 + 3, 3 * 5 + 3, 4 * 5 + 3]);
+    const s = score(p, 0, dead);
+    // 白の壁が消え、右半分3列すべてが黒地になる
+    expect(s.black).toBe(25);
+    expect(s.white).toBe(0);
+    expect(s.winner).toBe(BLACK);
+  });
+
+  it('両色に接する空点は中立として数えない', () => {
+    const p = createPosition(3);
+    p.stones[0] = BLACK;   // 左上
+    p.stones[8] = WHITE;   // 右下
+    const s = score(p, 0, new Set());
+    // 残り7点はどちらにも接するので中立。石1つずつのみ
+    expect(s.black).toBe(1);
+    expect(s.white).toBe(1);
+  });
+
+  it('空盤は誰の地でもない', () => {
+    const s = score(createPosition(5), 6.5, new Set());
+    expect(s.black).toBe(0);
+    expect(s.white).toBe(0);
+    expect(s.winner).toBe(WHITE);   // コミのぶん白
+  });
+});
+
+describe('連の取得（死石のトグル用）', () => {
+  it('つながった石をまとめて返す', () => {
+    const p = createPosition(5);
+    for (const q of [6, 7, 12]) p.stones[q] = BLACK;
+    p.stones[8] = WHITE;
+    expect([...groupAt(p, 6)].sort((a, b) => a - b)).toEqual([6, 7, 12]);
+    expect([...groupAt(p, 8)]).toEqual([8]);
+  });
+
+  it('空点は空集合', () => {
+    expect(groupAt(createPosition(5), 0).size).toBe(0);
   });
 });

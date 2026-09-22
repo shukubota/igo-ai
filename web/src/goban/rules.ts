@@ -6,8 +6,10 @@
  *
  * 未実装（SPEC_UI.md の Phase U1）:
  *   - 超コウ（同一局面反復）
- *   - 終局判定（両者連続パス）
  *   - 地の計算
+ *
+ * 終局判定（両者連続パス）と投了は App.tsx 側で持つ。エンジンはステートレスで
+ * 対局の進行を知らないため、対局状態は UI の責務。
  */
 import { EMPTY, BLACK, WHITE, type Color } from '../types';
 
@@ -120,4 +122,83 @@ export function toGtp(size: number, p: number): string {
   const letters = 'ABCDEFGHJKLMNOPQRST';
   const r = Math.floor(p / size), c = p % size;
   return `${letters[c]}${size - r}`;
+}
+
+/** p を含む連の石集合。死石のトグルで連ごと選ぶために使う。 */
+export function groupAt(pos: Position, p: number): Set<number> {
+  if (pos.stones[p] === EMPTY) return new Set();
+  return groupAndLiberties(pos.stones, pos.size, p).group;
+}
+
+export interface Score {
+  /** 黒の地 + 生きている黒石 */
+  black: number;
+  white: number;
+  komi: number;
+  /** black - (white + komi)。正なら黒勝ち */
+  diff: number;
+  /** 持碁（diff === 0）なら null */
+  winner: Color | null;
+  /** 各点の帰属。EMPTY=中立（ダメ・セキ）、BLACK/WHITE=その色の地か石 */
+  owner: Int8Array;
+}
+
+/**
+ * 中国ルール（地 + 石）で数える。
+ *
+ * ⚠️ 死活はここでは判定しない。`dead` に入っている石を取り除いた盤面を
+ * 「すべての石が生きている」前提で数えるだけ。死活の判断は呼び出し側
+ * （＝人間）の責任。ニューラルネットの ownership は値域が [-1,1] に
+ * 収まっておらず（実測で -2.6 まで出る）解釈が未確定なので使っていない。
+ *
+ * 空点は、隣接する石がすべて同色ならその色の地。両色に接する点と、
+ * どの石にも到達しない点（空盤など）は中立として数えない。
+ */
+export function score(pos: Position, komi: number, dead: ReadonlySet<number>): Score {
+  const { size } = pos;
+  const n = size * size;
+  const stones = Int8Array.from(pos.stones);
+  for (const p of dead) stones[p] = EMPTY;
+
+  const owner = new Int8Array(n);
+  for (let p = 0; p < n; p++) if (stones[p] !== EMPTY) owner[p] = stones[p]!;
+
+  const seen = new Uint8Array(n);
+  for (let start = 0; start < n; start++) {
+    if (stones[start] !== EMPTY || seen[start]) continue;
+    // 空点の連結成分をまとめて塗る
+    const region: number[] = [];
+    const touching = new Set<number>();
+    const stack = [start];
+    seen[start] = 1;
+    while (stack.length) {
+      const q = stack.pop()!;
+      region.push(q);
+      for (const nb of neighbors(size, q)) {
+        const v = stones[nb]!;
+        if (v === EMPTY) {
+          if (!seen[nb]) { seen[nb] = 1; stack.push(nb); }
+        } else {
+          touching.add(v);
+        }
+      }
+    }
+    if (touching.size === 1) {
+      const c = [...touching][0]!;
+      for (const q of region) owner[q] = c;
+    }
+  }
+
+  let black = 0, white = 0;
+  for (let p = 0; p < n; p++) {
+    if (owner[p] === BLACK) black++;
+    else if (owner[p] === WHITE) white++;
+  }
+
+  const diff = black - (white + komi);
+  return {
+    black, white, komi, diff,
+    winner: diff === 0 ? null : diff > 0 ? BLACK : WHITE,
+    owner,
+  };
 }

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from goban import Board, PASS
 from mcts import MCTS
 import features as F
+import kifu
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("goai")
@@ -169,6 +170,26 @@ def genmove(pos: Position):
             for i in idx if probs[i] > 0
         ]
     return body
+
+
+class KifuImport(BaseModel):
+    url: str = Field(..., max_length=500,
+                     description="囲碁クエストの棋譜 URL、または対局 ID")
+
+
+@app.post("/kifu")
+def import_kifu(body: KifuImport):
+    """外部サービスの棋譜を取り込む。
+
+    ブラウザから直接叩けない（先方が CORS を許可していない）ので中継する。
+    URL はそのまま使わず ID だけ抜いて組み立て直す（kifu.py 参照）。
+    """
+    try:
+        return kifu.import_goquest(body.url)
+    except kifu.KifuError as e:
+        # 入力が悪いのか先方が落ちているのか区別できないので 400 に寄せる。
+        # どちらにせよユーザーに見せるのは同じ文言になる。
+        raise HTTPException(400, str(e))
 
 
 @app.post("/analyze")

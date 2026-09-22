@@ -8,6 +8,12 @@ interface Props {
   lastMove: number;
   onPlay: (index: number) => void;
   disabled?: boolean;
+  /** 整地モード: 死石に指定した点 */
+  dead?: ReadonlySet<number>;
+  /** 整地モード: 各点の帰属（0=中立 1=黒 2=白） */
+  territory?: Int8Array | null;
+  /** 検討モード: 候補手。weight は 0..1 に正規化済み */
+  candidates?: Array<{ move: number; label: string; weight: number }>;
 }
 
 /**
@@ -32,7 +38,8 @@ function hoshi(size: number): Array<[number, number]> {
   return [];
 }
 
-export function Board({ size, stones, lastMove, onPlay, disabled }: Props) {
+export function Board({ size, stones, lastMove, onPlay, disabled,
+                       dead, territory, candidates }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -73,6 +80,20 @@ export function Board({ size, stones, lastMove, onPlay, disabled }: Props) {
         ctx.fill();
       }
 
+      // 地（整地モード）。石より先に描いて石の下に敷く。
+      if (territory) {
+        const t = gap * 0.18;
+        for (let p = 0; p < size * size; p++) {
+          const v = territory[p];
+          if (!v || stones[p]) continue;   // 石のある点には描かない
+          ctx.fillStyle = v === BLACK ? 'rgba(20,20,20,.55)' : 'rgba(250,250,250,.85)';
+          ctx.strokeStyle = 'rgba(120,120,120,.6)';
+          const x = pad + (p % size) * gap, y = pad + Math.floor(p / size) * gap;
+          ctx.beginPath(); ctx.rect(x - t, y - t, t * 2, t * 2);
+          ctx.fill(); ctx.stroke();
+        }
+      }
+
       // 石
       const rad = gap * 0.47;
       for (let p = 0; p < size * size; p++) {
@@ -83,10 +104,26 @@ export function Board({ size, stones, lastMove, onPlay, disabled }: Props) {
         const g = ctx.createRadialGradient(x - rad * 0.35, y - rad * 0.35, rad * 0.1, x, y, rad);
         if (v === BLACK) { g.addColorStop(0, '#5a5a5a'); g.addColorStop(1, '#0a0a0a'); }
         else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c8c5bd'); }
+        const isDead = dead?.has(p) ?? false;
+        ctx.save();
+        if (isDead) ctx.globalAlpha = 0.32;   // 死石は薄く
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, rad, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
+
+        if (isDead) {
+          // 薄くするだけだと色の濃淡と紛れるので × も重ねる
+          ctx.strokeStyle = '#c0392b';
+          ctx.lineWidth = Math.max(1.6, css / 260);
+          const d = rad * 0.55;
+          ctx.beginPath();
+          ctx.moveTo(x - d, y - d); ctx.lineTo(x + d, y + d);
+          ctx.moveTo(x + d, y - d); ctx.lineTo(x - d, y + d);
+          ctx.stroke();
+          continue;   // 死石には最終手マークを出さない
+        }
 
         if (p === lastMove) {
           ctx.strokeStyle = v === BLACK ? '#fff' : '#000';
@@ -96,6 +133,25 @@ export function Board({ size, stones, lastMove, onPlay, disabled }: Props) {
           ctx.stroke();
         }
       }
+
+      // 候補手（検討モード）。着手可能な空点に確率/訪問数を重ねる。
+      if (candidates?.length) {
+        const r2 = gap * 0.42;
+        for (const c of candidates) {
+          if (c.move < 0 || c.move >= size * size || stones[c.move]) continue;
+          const x = pad + (c.move % size) * gap;
+          const y = pad + Math.floor(c.move / size) * gap;
+          ctx.fillStyle = `rgba(30,110,200,${0.18 + c.weight * 0.5})`;
+          ctx.beginPath(); ctx.arc(x, y, r2, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(20,80,160,.9)';
+          ctx.lineWidth = Math.max(1, css / 420);
+          ctx.stroke();
+          ctx.fillStyle = '#fff';
+          ctx.font = `${Math.max(8, gap * 0.34)}px system-ui, sans-serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(c.label, x, y);
+        }
+      }
     };
 
     draw();
@@ -103,7 +159,7 @@ export function Board({ size, stones, lastMove, onPlay, disabled }: Props) {
     const ro = new ResizeObserver(draw);
     ro.observe(cv);
     return () => ro.disconnect();
-  }, [size, stones, lastMove]);
+  }, [size, stones, lastMove, dead, territory, candidates]);
 
   const handleClick = (ev: React.MouseEvent<HTMLCanvasElement>) => {
     if (disabled) return;

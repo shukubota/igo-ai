@@ -84,3 +84,20 @@ export interface HealthResponse {
 export function toBlackWinrate(winrate: number, toMove: Color): number {
   return toMove === BLACK ? winrate : 1 - winrate;
 }
+
+/** 外部サービスから取り込んだ棋譜。engine/kifu.py の返す形と手で同期させる。 */
+export interface KifuPlayer { name: string | null; rating: number | null }
+export interface KifuMove { move: Move; color: Color; time_ms: number | null }
+export interface KifuResult { winner: Color | null; reason: string; text: string }
+export interface KifuGame {
+  source: string;
+  id: string | null;
+  size: number;
+  /** 囲碁クエストの JSON にコミは無いので null が来る */
+  komi: number | null;
+  black: KifuPlayer;
+  white: KifuPlayer;
+  moves: KifuMove[];
+  result: KifuResult | null;
+  created: string | null;
+}

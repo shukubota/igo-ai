@@ -1,16 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Board } from './components/Board';
-import { genmove, API_BASE } from './api/client';
+import { genmove, importKifu, API_BASE } from './api/client';
 import { ApiLog, type ApiLogEntry } from './components/ApiLog';
 import { WinrateChart, type WinratePoint } from './components/WinrateChart';
 import {
   createPosition, tryPlay, pass, toGtp, score, groupAt,
   type Position, type Score,
 } from './goban/rules';
-import { PASS, BLACK, WHITE, toBlackWinrate,
-         type Color, type GenmoveRequest, type GenmoveResponse } from './types';
+import { PASS, BLACK, WHITE, toBlackWinrate, type Candidate, type Color,
+         type GenmoveRequest, type GenmoveResponse, type KifuGame, type Move } from './types';
 
-const SIZES = [13, 19] as const;
+const SIZES = [9, 13, 19] as const;
 type Size = (typeof SIZES)[number];
 const DEFAULT_SIZE: Size = 13;
 
@@ -28,8 +28,29 @@ const COLOR_LABEL: Record<Color, string> = { [BLACK]: '黒', [WHITE]: '白' };
  */
 type Phase = 'playing' | 'scoring' | 'review';
 
+/**
+ * 全手解析の結果。1局面 = 1件。
+ *
+ * 「この局面で AI なら何を打つか」と「実際に何が打たれたか」を並べて持つのが要点。
+ * loss はその手で手番側が失った勝率で、悪手の大きさの目安になる。
+ */
+interface PlyReview {
+  ply: number;
+  /** この局面の評価（黒視点） */
+  black: number;
+  toMove: Color;
+  /** AI の候補手 */
+  candidates: Candidate[];
+  /** 実際に打たれた手。最終局面では null */
+  actual: Move | null;
+  /** actual が候補の何番目だったか。圏外なら null */
+  actualRank: number | null;
+  /** この手で手番側が失った勝率。次の局面が無ければ null */
+  loss: number | null;
+}
+
 interface GameResult {
-  kind: 'pass' | 'resign';
+  kind: 'pass' | 'resign' | 'imported';
   /** 投了で決まった場合の勝者。整地で決まる場合は null（score 側に入る） */
   winner: Color | null;
   text: string;
@@ -64,6 +85,15 @@ export default function App() {
   /** 検討で見ている手数。plies のインデックス */
   const [cursor, setCursor] = useState(0);
   const [analysis, setAnalysis] = useState<{ ply: number; res: GenmoveResponse } | null>(null);
+  const [kifu, setKifu] = useState<KifuGame | null>(null);
+  const [kifuUrl, setKifuUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  /** 全手の一括解析の進捗。null なら走っていない */
+  const [sweep, setSweep] = useState<{ done: number; total: number } | null>(null);
+  const [review, setReview] = useState<PlyReview[]>([]);
+  /** 検討でどちら側の視点に立つか。取り込み時に選ぶ */
+  const [myColor, setMyColor] = useState<Color>(BLACK);
+  const [showCandidates, setShowCandidates] = useState(true);
 
   const abort = useRef<AbortController | null>(null);
   const logSeq = useRef(0);
@@ -84,10 +114,22 @@ export default function App() {
     ? (cursor > 0 ? history[cursor - 1]! : -1)
     : lastMove;
 
+  const atCursor = useMemo(
+    () => review.find((r) => r.ply === cursor) ?? null, [review, cursor]);
+
+  /** 自分の手のうち、失った勝率が大きい順。振り返りの入口。 */
+  const myMistakes = useMemo(() => review
+    .filter((r) => r.toMove === myColor && r.loss !== null && r.loss > 0.02)
+    .sort((a, b) => (b.loss ?? 0) - (a.loss ?? 0))
+    .slice(0, 12), [review, myColor]);
+
   // 検討中に表示する候補手。重みは最大値で正規化して濃さに使う。
+  // 個別解析の結果を優先し、無ければ全手解析の結果を使う。
   const overlayCandidates = useMemo(() => {
-    if (phase !== 'review' || !analysis || analysis.ply !== cursor) return undefined;
-    const cs = analysis.res.candidates ?? [];
+    if (phase !== 'review') return undefined;
+    const fromAnalysis = analysis && analysis.ply === cursor ? analysis.res.candidates : null;
+    const cs = fromAnalysis ?? (showCandidates ? atCursor?.candidates ?? null : null);
+    if (!cs) return undefined;
     const val = (c: { visits?: number; prob?: number }) => c.visits ?? c.prob ?? 0;
     const max = cs.reduce((m, c) => Math.max(m, val(c)), 0) || 1;
     return cs.filter((c) => c.move >= 0).map((c) => ({
@@ -95,7 +137,7 @@ export default function App() {
       label: c.visits !== undefined ? String(c.visits) : `${Math.round(val(c) * 100)}`,
       weight: val(c) / max,
     }));
-  }, [phase, analysis, cursor]);
+  }, [phase, analysis, cursor, showCandidates, atCursor]);
 
   // ログは最新30件まで。対局中ずっと溜め続けても困らない程度に抑える。
   const pushLog = (e: ApiLogEntry) => setLog((xs) => [e, ...xs].slice(0, 30));
@@ -248,7 +290,7 @@ export default function App() {
     setPos(fresh); setHistory([]); setSnapshots([]); setPlies([fresh]);
     setLast(null); setError(null); setCurve([]);
     setPhase('playing'); setResult(null); setFinalScore(null);
-    setDead(new Set()); setAnalysis(null); setCursor(0);
+    setDead(new Set()); setAnalysis(null); setCursor(0); setKifu(null); setReview([]);
     if (nextHuman === WHITE) void askEngine(fresh, []);
   }, [askEngine]);
 
@@ -275,6 +317,98 @@ export default function App() {
       setError(msg);
     } finally {
       setThinking(false);
+      abort.current = null;
+    }
+  };
+
+  /** 囲碁クエストの棋譜を取り込んで検討モードに入る。 */
+  const handleImport = async () => {
+    if (importing || sweep) return;
+    setImporting(true); setError(null);
+    try {
+      const g = await importKifu(kifuUrl.trim());
+      // 局面列を作り直す。こちらのルールで再生できない手が来たらそこで止める。
+      const ps: Position[] = [createPosition(g.size)];
+      const hs: number[] = [];
+      let broke: number | null = null;
+      for (const m of g.moves) {
+        const cur = ps[ps.length - 1]!;
+        const nx = m.move === PASS ? pass(cur) : tryPlay(cur, m.move, m.color);
+        if (!nx) { broke = hs.length + 1; break; }
+        ps.push(nx); hs.push(m.move);
+      }
+      abort.current?.abort();
+      setKifu(g);
+      setSize(g.size as Size);
+      setPlies(ps); setHistory(hs); setPos(ps[ps.length - 1]!);
+      setSnapshots([]); setCurve([]); setAnalysis(null); setLast(null); setReview([]);
+      setFinalScore(null); setDead(new Set());
+      setResult(g.result
+        ? { kind: 'imported', winner: g.result.winner, text: g.result.text }
+        : null);
+      setCursor(0);
+      setPhase('review');
+      if (broke !== null) {
+        setError(`${broke} 手目を再生できませんでした。そこまでを読み込んでいます`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  /**
+   * 全局面をまとめて評価して勝率の推移を作る。
+   *
+   * ここは visits=1 に固定する。欲しいのは value ヘッドの数字だけで探索は要らず、
+   * 130手を探索つきで回すと分単位になるため。個別の局面は「この局面を解析」で深く見る。
+   */
+  const handleSweep = async () => {
+    if (thinking || sweep) return;
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    setSweep({ done: 0, total: plies.length });
+    setCurve([]); setReview([]); setError(null);
+
+    const acc: PlyReview[] = [];
+    try {
+      for (let i = 0; i < plies.length; i++) {
+        if (ctrl.signal.aborted) break;
+        const p = plies[i]!;
+        // 候補も一緒に取る。探索しないので top_k を増やしても時間は変わらない。
+        const req = buildReq(p, history.slice(0, i), { visits: 1, top_k: 6, temperature: 0 });
+        const id = ++logSeq.current;
+        const at = new Date();
+        const t0 = performance.now();
+        const res = await genmove(req, ctrl.signal);
+        pushLog({ id, at, path: '/genmove', req, res,
+                  elapsedMs: Math.round(performance.now() - t0) });
+
+        const black = toBlackWinrate(res.winrate, p.toMove);
+        const actual = i < history.length ? history[i]! : null;
+        const cands = res.candidates ?? [];
+        const rank = actual === null ? null
+          : (cands.findIndex((c) => c.move === actual) + 1) || null;
+
+        acc.push({ ply: i, black, toMove: p.toMove, candidates: cands,
+                   actual, actualRank: rank, loss: null });
+        // 1つ前の手の loss は、今の評価が出て初めて確定する
+        const prev = acc[acc.length - 2];
+        if (prev) {
+          const before = prev.toMove === BLACK ? prev.black : 1 - prev.black;
+          const after = prev.toMove === BLACK ? black : 1 - black;
+          prev.loss = before - after;
+        }
+        setReview([...acc]);
+        setCurve((xs) => [...xs, { ply: i, black }]);
+        setSweep({ done: i + 1, total: plies.length });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!ctrl.signal.aborted) setError(msg);
+    } finally {
+      setSweep(null);
       abort.current = null;
     }
   };
@@ -315,7 +449,8 @@ export default function App() {
                  disabled={phase === 'review' || (phase === 'playing' && (thinking || !myTurn))}
                  dead={phase === 'scoring' ? dead : undefined}
                  territory={phase === 'scoring' ? liveScore!.owner : null}
-                 candidates={overlayCandidates} />
+                 candidates={overlayCandidates}
+                 actualMove={phase === 'review' ? atCursor?.actual ?? undefined : undefined} />
 
           {phase === 'scoring' && (
             <div className="phasebar">
@@ -359,16 +494,71 @@ export default function App() {
                 </span>
               </span>
               <span className="phasebar-btns">
-                <button className="btn-analyze" onClick={handleAnalyze} disabled={thinking}>
+                {sweep
+                  ? <button onClick={() => abort.current?.abort()}>
+                      中止（{sweep.done}/{sweep.total}）
+                    </button>
+                  : <button className="btn-sweep" onClick={handleSweep} disabled={thinking}>
+                      全手を解析
+                    </button>}
+                <label className="toggle" title="全手解析の候補を各局面で表示する">
+                  <input type="checkbox" checked={showCandidates}
+                         onChange={(e) => setShowCandidates(e.target.checked)} />
+                  AI候補
+                </label>
+                <button className="btn-analyze" onClick={handleAnalyze}
+                        disabled={thinking || !!sweep}>
                   {thinking ? '解析中…' : 'この局面を解析'}
                 </button>
-                {!result && <button onClick={resumePlay}>対局に戻る</button>}
+                {!result && !sweep && <button onClick={resumePlay}>対局に戻る</button>}
               </span>
             </div>
           )}
         </div>
 
         <aside>
+          <div className="panel">
+            <label htmlFor="kifu">囲碁クエストの棋譜を検討</label>
+            <div className="import-row">
+              <input id="kifu" type="text" value={kifuUrl} placeholder="棋譜の URL か対局 ID"
+                     disabled={importing || !!sweep}
+                     onChange={(e) => setKifuUrl(e.target.value)}
+                     onKeyDown={(e) => { if (e.key === 'Enter') void handleImport(); }} />
+              <button onClick={handleImport} disabled={importing || !!sweep || !kifuUrl.trim()}>
+                {importing ? '取得中…' : '読み込む'}
+              </button>
+            </div>
+            {kifu && (
+              <div className="kifu-meta muted">
+                <div>
+                  <strong>●{kifu.black.name ?? '黒'}</strong>
+                  {kifu.black.rating != null && ` (${Math.round(kifu.black.rating)})`}
+                  {' vs '}
+                  <strong>○{kifu.white.name ?? '白'}</strong>
+                  {kifu.white.rating != null && ` (${Math.round(kifu.white.rating)})`}
+                </div>
+                <div>
+                  {kifu.size} 路 / {kifu.moves.length} 手
+                  {kifu.result && ` / ${kifu.result.text}`}
+                  {kifu.created && ` / ${kifu.created.slice(0, 10)}`}
+                </div>
+                {/* 先方の JSON にコミが無い。勝敗は先方の結果が正なので、
+                    ここのコミは検討中の評価にだけ効く。 */}
+                <div>コミ {KOMI}（棋譜に含まれないため既定値）</div>
+              </div>
+            )}
+            {kifu && (
+              <div className="viewpoint">
+                <label htmlFor="mycolor">自分の視点</label>
+                <select id="mycolor" value={myColor}
+                        onChange={(e) => setMyColor(Number(e.target.value) as Color)}>
+                  <option value={BLACK}>●{kifu.black.name ?? '黒'}（黒）</option>
+                  <option value={WHITE}>○{kifu.white.name ?? '白'}（白）</option>
+                </select>
+              </div>
+            )}
+          </div>
+
           <div className="panel">
             <label>黒の勝率 {(blackWinrate * 100).toFixed(1)}%</label>
             <div className="wr"><div style={{ width: `${blackWinrate * 100}%` }} /></div>
@@ -391,6 +581,67 @@ export default function App() {
                 </tbody>
               </table>
               <p className="muted">中国ルール（地＋石）。死活は手動指定。</p>
+            </div>
+          )}
+
+          {phase === 'review' && atCursor && (
+            <div className="panel">
+              <label>
+                {cursor} 手目の局面（{COLOR_LABEL[atCursor.toMove]}番）
+                {atCursor.toMove === myColor && <span className="mine"> あなたの手番</span>}
+              </label>
+              {atCursor.actual !== null ? (
+                <p className="actual">
+                  実際: <strong>{atCursor.actual === PASS ? 'パス' : toGtp(size, atCursor.actual)}</strong>
+                  {atCursor.actualRank
+                    ? <span className="muted"> — AI候補の {atCursor.actualRank} 番目</span>
+                    : <span className="muted"> — AI候補に入っていない</span>}
+                  {atCursor.loss !== null && (
+                    <span className={atCursor.loss > 0.05 ? 'err' : 'muted'}>
+                      {' '}/ 勝率 {atCursor.loss >= 0 ? '−' : '+'}
+                      {Math.abs(atCursor.loss * 100).toFixed(1)}pt
+                    </span>
+                  )}
+                </p>
+              ) : <p className="muted">最終局面</p>}
+              <ol className="cand-list">
+                {atCursor.candidates.map((c) => (
+                  <li key={c.move} className={c.move === atCursor.actual ? 'played' : undefined}>
+                    <span>
+                      {c.move === PASS ? 'パス' : toGtp(size, c.move)}
+                      {c.move === atCursor.actual && ' ←実戦'}
+                    </span>
+                    <span className="muted">
+                      {c.visits !== undefined ? `${c.visits}v` : `${((c.prob ?? 0) * 100).toFixed(1)}%`}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {phase === 'review' && myMistakes.length > 0 && (
+            <div className="panel">
+              <label>
+                {COLOR_LABEL[myColor]}番の失点が大きかった手（上位 {myMistakes.length}）
+              </label>
+              <ol className="mistakes">
+                {myMistakes.map((r) => (
+                  <li key={r.ply} onClick={() => seek(r.ply)}
+                      className={cursor === r.ply ? 'at' : undefined}>
+                    <span>{r.ply + 1} 手目</span>
+                    <span>{r.actual === PASS ? 'パス' : toGtp(size, r.actual!)}</span>
+                    <span className="muted">
+                      {r.candidates[0] && `AI: ${r.candidates[0].move === PASS
+                        ? 'パス' : toGtp(size, r.candidates[0].move)}`}
+                    </span>
+                    <span className="err">−{((r.loss ?? 0) * 100).toFixed(1)}pt</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="muted">
+                クリックでその局面へ。評価値の絶対値はずれているので、下落幅を目安に見る。
+              </p>
             </div>
           )}
 
@@ -455,8 +706,15 @@ export default function App() {
             {phase === 'scoring' && (
               <span className="over">死活を確認してください</span>
             )}
-            {phase === 'review' && result && <span className="over">{result.text}</span>}
-            {phase === 'review' && !result && <span className="muted">検討モード</span>}
+            {sweep && (
+              <span>
+                全手を解析中 {sweep.done}/{sweep.total}
+                （visits=1 固定。探索なしの評価値）
+              </span>
+            )}
+            {phase === 'review' && !sweep && result && <span className="over">{result.text}</span>}
+            {phase === 'review' && !sweep && !result &&
+              <span className="muted">検討モード</span>}
             {playing && thinking && <span>AI 思考中…</span>}
             {error && <span className="err">{error}</span>}
             {playing && !thinking && !error && last && (

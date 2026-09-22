@@ -1,5 +1,5 @@
 import type {
-  GenmoveRequest, GenmoveResponse, AnalyzeResponse, HealthResponse,
+  GenmoveRequest, GenmoveResponse, AnalyzeResponse, HealthResponse, KifuGame,
 } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)
@@ -49,6 +49,13 @@ export const genmove = (req: GenmoveRequest, signal?: AbortSignal) =>
 
 export const analyze = (req: GenmoveRequest, signal?: AbortSignal) =>
   post<AnalyzeResponse>('/analyze', req, signal);
+
+/**
+ * 外部サービスの棋譜を取り込む。
+ * 先方が CORS を許可していないのでブラウザからは直接取れず、エンジンが中継する。
+ */
+export const importKifu = (url: string, signal?: AbortSignal) =>
+  post<KifuGame>('/kifu', { url }, signal);
 
 export async function health(): Promise<HealthResponse> {
   const res = await fetch(`${API_BASE}/health`);

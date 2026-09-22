@@ -14,6 +14,8 @@ interface Props {
   territory?: Int8Array | null;
   /** 検討モード: 候補手。weight は 0..1 に正規化済み */
   candidates?: Array<{ move: number; label: string; weight: number }>;
+  /** 検討モード: 実際に打たれた手。候補と見分けるため印を変える */
+  actualMove?: number;
 }
 
 /**
@@ -39,7 +41,7 @@ function hoshi(size: number): Array<[number, number]> {
 }
 
 export function Board({ size, stones, lastMove, onPlay, disabled,
-                       dead, territory, candidates }: Props) {
+                       dead, territory, candidates, actualMove }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -152,6 +154,17 @@ export function Board({ size, stones, lastMove, onPlay, disabled,
           ctx.fillText(c.label, x, y);
         }
       }
+
+      // 実際に打たれた手。AI の候補と重なっていても分かるよう外側に輪を描く。
+      if (actualMove !== undefined && actualMove >= 0 && actualMove < size * size) {
+        const x = pad + (actualMove % size) * gap;
+        const y = pad + Math.floor(actualMove / size) * gap;
+        ctx.strokeStyle = '#c0392b';
+        ctx.lineWidth = Math.max(1.6, css / 260);
+        ctx.beginPath();
+        ctx.arc(x, y, gap * 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     };
 
     draw();
@@ -159,7 +172,7 @@ export function Board({ size, stones, lastMove, onPlay, disabled,
     const ro = new ResizeObserver(draw);
     ro.observe(cv);
     return () => ro.disconnect();
-  }, [size, stones, lastMove, dead, territory, candidates]);
+  }, [size, stones, lastMove, dead, territory, candidates, actualMove]);
 
   const handleClick = (ev: React.MouseEvent<HTMLCanvasElement>) => {
     if (disabled) return;

@@ -1,5 +1,7 @@
 # igo-ai
 
+[![CI](https://github.com/shukubota/igo-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/shukubota/igo-ai/actions/workflows/ci.yml)
+
 KataGo のニューラルネット（ONNX）を使った囲碁の対局・解析アプリ。
 
 - `engine/` — Python の推論サーバー。FastAPI + ONNX Runtime + 自前の MCTS
@@ -140,6 +142,34 @@ $20〜30 相当**を見込むこと。短く済ませるなら `--max-moves` を
 強さを競わせるより、**この「自信と実際の評価のズレ」を検討モードで観察する**のが
 このスクリプトの用途。棋譜には各手の `by`（誰が打ったか）と `note`（Claude 本人の
 説明）が入るので、検討パネルで評価値と並べて読める。
+
+## 開発コマンド
+
+CI（`.github/workflows/ci.yml`）が push と PR で回すのと同じもの。
+
+```bash
+# engine
+cd engine
+pip install -r requirements-dev.txt   # 本番用は requirements.txt のみ
+ruff check .                          # lint
+ruff format .                         # 整形（CI では強制しない。下記参照）
+mypy .                                # 型
+pytest                                # テスト（モデル不要）
+
+# web
+cd web
+npm run lint
+npm run format:check                  # npm run format で修正
+npm run typecheck
+npm test
+```
+
+**Python は整形を CI で強制していない。** `goban.py` の近傍列挙のように、4方向を
+縦に揃えた方が読みやすい箇所を `ruff format` が崩すため。lint（`ruff check`）は
+強制する。TypeScript は Prettier を強制する。
+
+**engine のテストはモデルを必要としない**（盤ルールと棋譜パースのみ）。147MB の
+`model.onnx` を落とさずに済むので CI が速い。
 
 ## ⚠️ 最初にやること
 

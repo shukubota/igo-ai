@@ -216,3 +216,7 @@ aside { display: flex; flex-direction: column; gap: 12px; }
 .mistakes li:hover { background: rgba(128,128,128,.14); }
 .mistakes li.at { background: rgba(128,128,128,.24); }
 .mistakes li span:last-child { text-align: right; }
+
+.file-row { display: block; margin-top: 8px; font-size: 11px; }
+.file-row input { display: block; margin-top: 4px; font-size: 11px; max-width: 100%; }
+.by-note { margin: 0 0 6px; font-size: 12px; }

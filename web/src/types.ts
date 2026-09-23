@@ -87,7 +87,15 @@ export function toBlackWinrate(winrate: number, toMove: Color): number {
 
 /** 外部サービスから取り込んだ棋譜。engine/kifu.py の返す形と手で同期させる。 */
 export interface KifuPlayer { name: string | null; rating: number | null }
-export interface KifuMove { move: Move; color: Color; time_ms: number | null }
+export interface KifuMove {
+  move: Move;
+  color: Color;
+  time_ms: number | null;
+  /** 誰が打ったか。llm_vs_katago.py が入れる（"Claude" / "KataGo"） */
+  by?: string;
+  /** その手の理由。Claude の手なら本人の説明が入る */
+  note?: string;
+}
 export interface KifuResult { winner: Color | null; reason: string; text: string }
 export interface KifuGame {
   source: string;

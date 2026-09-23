@@ -326,7 +326,32 @@ export default function App() {
     if (importing || sweep) return;
     setImporting(true); setError(null);
     try {
-      const g = await importKifu(kifuUrl.trim());
+      loadKifu(await importKifu(kifuUrl.trim()));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  /** ローカルの棋譜 JSON を読む。llm_vs_katago.py の出力がそのまま入る。 */
+  const handleImportFile = async (file: File) => {
+    if (importing || sweep) return;
+    setImporting(true); setError(null);
+    try {
+      const g = JSON.parse(await file.text()) as KifuGame;
+      if (!g?.moves || !g?.size) throw new Error('棋譜の形式が違います');
+      loadKifu(g);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  /** 取り込んだ棋譜を盤に載せて検討モードに入る。URL 経由とファイル経由で共通。 */
+  const loadKifu = (g: KifuGame) => {
+    {
       // 局面列を作り直す。こちらのルールで再生できない手が来たらそこで止める。
       const ps: Position[] = [createPosition(g.size)];
       const hs: number[] = [];
@@ -351,10 +376,6 @@ export default function App() {
       if (broke !== null) {
         setError(`${broke} 手目を再生できませんでした。そこまでを読み込んでいます`);
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -528,6 +549,16 @@ export default function App() {
                 {importing ? '取得中…' : '読み込む'}
               </button>
             </div>
+            <label className="file-row muted">
+              またはローカルの棋譜 JSON（llm_vs_katago.py の出力）
+              <input type="file" accept="application/json,.json"
+                     disabled={importing || !!sweep}
+                     onChange={(e) => {
+                       const f = e.target.files?.[0];
+                       if (f) void handleImportFile(f);
+                       e.target.value = '';   // 同じファイルを選び直せるように
+                     }} />
+            </label>
             {kifu && (
               <div className="kifu-meta muted">
                 <div>
@@ -590,6 +621,12 @@ export default function App() {
                 {cursor} 手目の局面（{COLOR_LABEL[atCursor.toMove]}番）
                 {atCursor.toMove === myColor && <span className="mine"> あなたの手番</span>}
               </label>
+              {kifu?.moves[cursor] && (kifu.moves[cursor]!.by || kifu.moves[cursor]!.note) && (
+                <p className="by-note">
+                  {kifu.moves[cursor]!.by && <strong>{kifu.moves[cursor]!.by}: </strong>}
+                  <span className="muted">{kifu.moves[cursor]!.note}</span>
+                </p>
+              )}
               {atCursor.actual !== null ? (
                 <p className="actual">
                   実際: <strong>{atCursor.actual === PASS ? 'パス' : toGtp(size, atCursor.actual)}</strong>

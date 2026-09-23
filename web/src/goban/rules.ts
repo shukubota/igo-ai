@@ -35,7 +35,8 @@ export function createPosition(size = 19): Position {
 }
 
 export function neighbors(size: number, p: number): number[] {
-  const r = Math.floor(p / size), c = p % size;
+  const r = Math.floor(p / size),
+    c = p % size;
   const out: number[] = [];
   if (r > 0) out.push(p - size);
   if (r < size - 1) out.push(p + size);
@@ -46,7 +47,9 @@ export function neighbors(size: number, p: number): number[] {
 
 /** p を含む連の石集合と呼吸点集合 */
 export function groupAndLiberties(
-  stones: Int8Array, size: number, p: number,
+  stones: Int8Array,
+  size: number,
+  p: number,
 ): { group: Set<number>; liberties: Set<number> } {
   const color = stones[p];
   if (!color) return { group: new Set(), liberties: new Set() };
@@ -58,7 +61,10 @@ export function groupAndLiberties(
     for (const nb of neighbors(size, q)) {
       const v = stones[nb];
       if (v === EMPTY) liberties.add(nb);
-      else if (v === color && !group.has(nb)) { group.add(nb); stack.push(nb); }
+      else if (v === color && !group.has(nb)) {
+        group.add(nb);
+        stack.push(nb);
+      }
     }
   }
   return { group, liberties };
@@ -103,7 +109,10 @@ export function tryPlay(pos: Position, p: number, color?: Color): Position | nul
   }
 
   return {
-    size, stones: next, toMove: opp, ko,
+    size,
+    stones: next,
+    toMove: opp,
+    ko,
     prisoners: { ...pos.prisoners, [col]: pos.prisoners[col] + caps.size },
   };
 }
@@ -120,7 +129,8 @@ export function pass(pos: Position): Position {
 export function toGtp(size: number, p: number): string {
   if (p < 0) return 'pass';
   const letters = 'ABCDEFGHJKLMNOPQRST';
-  const r = Math.floor(p / size), c = p % size;
+  const r = Math.floor(p / size),
+    c = p % size;
   return `${letters[c]}${size - r}`;
 }
 
@@ -177,7 +187,10 @@ export function score(pos: Position, komi: number, dead: ReadonlySet<number>): S
       for (const nb of neighbors(size, q)) {
         const v = stones[nb]!;
         if (v === EMPTY) {
-          if (!seen[nb]) { seen[nb] = 1; stack.push(nb); }
+          if (!seen[nb]) {
+            seen[nb] = 1;
+            stack.push(nb);
+          }
         } else {
           touching.add(v);
         }
@@ -189,7 +202,8 @@ export function score(pos: Position, komi: number, dead: ReadonlySet<number>): S
     }
   }
 
-  let black = 0, white = 0;
+  let black = 0,
+    white = 0;
   for (let p = 0; p < n; p++) {
     if (owner[p] === BLACK) black++;
     else if (owner[p] === WHITE) white++;
@@ -197,7 +211,10 @@ export function score(pos: Position, komi: number, dead: ReadonlySet<number>): S
 
   const diff = black - (white + komi);
   return {
-    black, white, komi, diff,
+    black,
+    white,
+    komi,
+    diff,
     winner: diff === 0 ? null : diff > 0 ? BLACK : WHITE,
     owner,
   };

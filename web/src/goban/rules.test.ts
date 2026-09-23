@@ -29,8 +29,11 @@ describe('自殺手', () => {
 
   it('相手を取れるなら合法', () => {
     const p = createPosition(19);
-    p.stones[1] = WHITE; p.stones[19] = WHITE;
-    p.stones[2] = BLACK; p.stones[20] = BLACK; p.stones[38] = BLACK;
+    p.stones[1] = WHITE;
+    p.stones[19] = WHITE;
+    p.stones[2] = BLACK;
+    p.stones[20] = BLACK;
+    p.stones[38] = BLACK;
     expect(isLegal(p, 0, BLACK)).toBe(true);
   });
 });
@@ -40,9 +43,13 @@ describe('コウ', () => {
 
   it('取り返しが禁止され、1手他所に打つと解除される', () => {
     let p = createPosition(19);
-    p.stones[ix(5, 6)] = BLACK; p.stones[ix(5, 7)] = WHITE;
-    p.stones[ix(6, 5)] = BLACK; p.stones[ix(6, 6)] = WHITE; p.stones[ix(6, 8)] = WHITE;
-    p.stones[ix(7, 6)] = BLACK; p.stones[ix(7, 7)] = WHITE;
+    p.stones[ix(5, 6)] = BLACK;
+    p.stones[ix(5, 7)] = WHITE;
+    p.stones[ix(6, 5)] = BLACK;
+    p.stones[ix(6, 6)] = WHITE;
+    p.stones[ix(6, 8)] = WHITE;
+    p.stones[ix(7, 6)] = BLACK;
+    p.stones[ix(7, 7)] = WHITE;
 
     p = tryPlay(p, ix(6, 7), BLACK)!;
     expect(p.stones[ix(6, 6)]).toBe(EMPTY);
@@ -86,8 +93,8 @@ describe('地の計算（中国ルール）', () => {
   const split = () => {
     const p = createPosition(5);
     for (let r = 0; r < 5; r++) {
-      p.stones[r * 5 + 2] = BLACK;   // 黒の壁
-      p.stones[r * 5 + 3] = WHITE;   // 白の壁
+      p.stones[r * 5 + 2] = BLACK; // 黒の壁
+      p.stones[r * 5 + 3] = WHITE; // 白の壁
     }
     return p;
   };
@@ -122,8 +129,8 @@ describe('地の計算（中国ルール）', () => {
 
   it('両色に接する空点は中立として数えない', () => {
     const p = createPosition(3);
-    p.stones[0] = BLACK;   // 左上
-    p.stones[8] = WHITE;   // 右下
+    p.stones[0] = BLACK; // 左上
+    p.stones[8] = WHITE; // 右下
     const s = score(p, 0, new Set());
     // 残り7点はどちらにも接するので中立。石1つずつのみ
     expect(s.black).toBe(1);
@@ -134,7 +141,7 @@ describe('地の計算（中国ルール）', () => {
     const s = score(createPosition(5), 6.5, new Set());
     expect(s.black).toBe(0);
     expect(s.white).toBe(0);
-    expect(s.winner).toBe(WHITE);   // コミのぶん白
+    expect(s.winner).toBe(WHITE); // コミのぶん白
   });
 });
 

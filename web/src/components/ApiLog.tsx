@@ -35,12 +35,16 @@ function Entry({ e }: { e: ApiLogEntry }) {
       <div className="log-head">
         <span className="log-time">{time(e.at)}</span>
         <code>POST {e.path}</code>
-        {e.error ? <span className="err">失敗</span> : <span className="muted">{e.elapsedMs} ms</span>}
+        {e.error ? (
+          <span className="err">失敗</span>
+        ) : (
+          <span className="muted">{e.elapsedMs} ms</span>
+        )}
       </div>
 
       <div className="log-req muted">
-        {e.req.size}路 / 手番 {e.req.to_move === 1 ? '黒' : '白'} / コミ {e.req.komi} /
-        {' '}visits {e.req.visits} / 温度 {e.req.temperature} / top_k {e.req.top_k}
+        {e.req.size}路 / 手番 {e.req.to_move === 1 ? '黒' : '白'} / コミ {e.req.komi} / visits{' '}
+        {e.req.visits} / 温度 {e.req.temperature} / top_k {e.req.top_k}
       </div>
 
       {e.error && <div className="err log-err">{e.error}</div>}
@@ -50,9 +54,10 @@ function Entry({ e }: { e: ApiLogEntry }) {
           <div className="log-pick">
             選んだ手 <strong>{e.res.move === PASS ? 'パス' : e.res.gtp}</strong>
             <span className="muted">
-              {' '}/ 勝率(手番) {(e.res.winrate * 100).toFixed(1)}% /
-              {' '}{e.res.search ? `探索 ${e.res.visits} visits` : '探索なし'} /
-              {' '}推論 {e.res.nn_calls} 回 {e.res.inference_ms} ms
+              {' '}
+              / 勝率(手番) {(e.res.winrate * 100).toFixed(1)}% /{' '}
+              {e.res.search ? `探索 ${e.res.visits} visits` : '探索なし'} / 推論{' '}
+              {e.res.nn_calls} 回 {e.res.inference_ms} ms
             </span>
           </div>
 
@@ -96,8 +101,12 @@ function Entry({ e }: { e: ApiLogEntry }) {
 export function ApiLog({ entries, open, onToggle, onClear, apiBase }: Props) {
   return (
     <div className={open ? 'apilog open' : 'apilog'}>
-      <button className="apilog-tab" onClick={onToggle}
-              aria-expanded={open} title="API 通信ログ">
+      <button
+        className="apilog-tab"
+        onClick={onToggle}
+        aria-expanded={open}
+        title="API 通信ログ"
+      >
         {open ? '›' : '‹'} API {entries.length ? `(${entries.length})` : ''}
       </button>
 
@@ -106,11 +115,19 @@ export function ApiLog({ entries, open, onToggle, onClear, apiBase }: Props) {
           <div className="apilog-head">
             <strong>API 通信</strong>
             <code className="muted">{apiBase}</code>
-            <button onClick={onClear} disabled={!entries.length}>消去</button>
+            <button onClick={onClear} disabled={!entries.length}>
+              消去
+            </button>
           </div>
-          {entries.length === 0
-            ? <p className="muted">まだリクエストがありません。盤に着手すると記録されます。</p>
-            : <ol className="apilog-list">{entries.map((e) => <Entry key={e.id} e={e} />)}</ol>}
+          {entries.length === 0 ? (
+            <p className="muted">まだリクエストがありません。盤に着手すると記録されます。</p>
+          ) : (
+            <ol className="apilog-list">
+              {entries.map((e) => (
+                <Entry key={e.id} e={e} />
+              ))}
+            </ol>
+          )}
         </div>
       )}
     </div>

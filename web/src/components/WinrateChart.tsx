@@ -41,30 +41,42 @@ export function WinrateChart({ points, cursorPly, onSeek }: Props) {
 
   return (
     <div className="wrchart">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
-           aria-label={`黒の勝率の推移。最新 ${(latest.black * 100).toFixed(1)}%`}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`黒の勝率の推移。最新 ${(latest.black * 100).toFixed(1)}%`}
+      >
         <rect x="0" y="0" width={W} height={H} className="wrc-bg" />
         <line x1="0" y1={y(0.5)} x2={W} y2={y(0.5)} className="wrc-mid" />
         <polygon points={area} className="wrc-area" />
         <polyline points={line} className="wrc-line" />
         <circle cx={x(points.length - 1)} cy={y(latest.black)} r="2.5" className="wrc-dot" />
-        {cursorPly !== undefined && (() => {
-          // 手数は飛び飛び（1往復1点）なので、一番近い点に線を合わせる
-          let best = 0;
-          points.forEach((p, i) => {
-            if (Math.abs(p.ply - cursorPly) < Math.abs(points[best]!.ply - cursorPly)) best = i;
-          });
-          return <line x1={x(best)} y1="0" x2={x(best)} y2={H} className="wrc-cursor" />;
-        })()}
+        {cursorPly !== undefined &&
+          (() => {
+            // 手数は飛び飛び（1往復1点）なので、一番近い点に線を合わせる
+            let best = 0;
+            points.forEach((p, i) => {
+              if (Math.abs(p.ply - cursorPly) < Math.abs(points[best]!.ply - cursorPly))
+                best = i;
+            });
+            return <line x1={x(best)} y1="0" x2={x(best)} y2={H} className="wrc-cursor" />;
+          })()}
         {onSeek && (
-          <rect x="0" y="0" width={W} height={H} fill="transparent"
-                className="wrc-hit"
-                onClick={(ev) => {
-                  const r = (ev.target as SVGRectElement).getBoundingClientRect();
-                  const ratio = (ev.clientX - r.left) / r.width;
-                  const i = Math.round(ratio * (points.length - 1));
-                  onSeek(points[Math.max(0, Math.min(points.length - 1, i))]!.ply);
-                }} />
+          <rect
+            x="0"
+            y="0"
+            width={W}
+            height={H}
+            fill="transparent"
+            className="wrc-hit"
+            onClick={(ev) => {
+              const r = (ev.target as SVGRectElement).getBoundingClientRect();
+              const ratio = (ev.clientX - r.left) / r.width;
+              const i = Math.round(ratio * (points.length - 1));
+              onSeek(points[Math.max(0, Math.min(points.length - 1, i))]!.ply);
+            }}
+          />
         )}
       </svg>
       <div className="wrc-axis muted">

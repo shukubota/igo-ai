@@ -1,15 +1,22 @@
 import type {
-  GenmoveRequest, GenmoveResponse, AnalyzeResponse, HealthResponse, KifuGame,
+  GenmoveRequest,
+  GenmoveResponse,
+  AnalyzeResponse,
+  HealthResponse,
+  KifuGame,
 } from '../types';
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)
-  ?? 'http://localhost:8080';
+const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8080';
 
 /** Cloud Run のコールドスタートは5秒以上かかる。短いタイムアウトは禁物。 */
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class ApiError extends Error {
-  constructor(message: string, readonly status?: number) {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
     super(message);
     this.name = 'ApiError';
   }

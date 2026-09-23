@@ -35,13 +35,36 @@ function hoshi(size: number): Array<[number, number]> {
     const xs = [3, 9, 15];
     return xs.flatMap((r) => xs.map((c) => [r, c] as [number, number]));
   }
-  if (size === 13) return [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]];
-  if (size === 9) return [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]];
+  if (size === 13)
+    return [
+      [3, 3],
+      [3, 9],
+      [9, 3],
+      [9, 9],
+      [6, 6],
+    ];
+  if (size === 9)
+    return [
+      [2, 2],
+      [2, 6],
+      [6, 2],
+      [6, 6],
+      [4, 4],
+    ];
   return [];
 }
 
-export function Board({ size, stones, lastMove, onPlay, disabled,
-                       dead, territory, candidates, actualMove }: Props) {
+export function Board({
+  size,
+  stones,
+  lastMove,
+  onPlay,
+  disabled,
+  dead,
+  territory,
+  candidates,
+  actualMove,
+}: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -87,12 +110,15 @@ export function Board({ size, stones, lastMove, onPlay, disabled,
         const t = gap * 0.18;
         for (let p = 0; p < size * size; p++) {
           const v = territory[p];
-          if (!v || stones[p]) continue;   // 石のある点には描かない
+          if (!v || stones[p]) continue; // 石のある点には描かない
           ctx.fillStyle = v === BLACK ? 'rgba(20,20,20,.55)' : 'rgba(250,250,250,.85)';
           ctx.strokeStyle = 'rgba(120,120,120,.6)';
-          const x = pad + (p % size) * gap, y = pad + Math.floor(p / size) * gap;
-          ctx.beginPath(); ctx.rect(x - t, y - t, t * 2, t * 2);
-          ctx.fill(); ctx.stroke();
+          const x = pad + (p % size) * gap,
+            y = pad + Math.floor(p / size) * gap;
+          ctx.beginPath();
+          ctx.rect(x - t, y - t, t * 2, t * 2);
+          ctx.fill();
+          ctx.stroke();
         }
       }
 
@@ -103,12 +129,24 @@ export function Board({ size, stones, lastMove, onPlay, disabled,
         if (!v) continue;
         const x = pad + (p % size) * gap;
         const y = pad + Math.floor(p / size) * gap;
-        const g = ctx.createRadialGradient(x - rad * 0.35, y - rad * 0.35, rad * 0.1, x, y, rad);
-        if (v === BLACK) { g.addColorStop(0, '#5a5a5a'); g.addColorStop(1, '#0a0a0a'); }
-        else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c8c5bd'); }
+        const g = ctx.createRadialGradient(
+          x - rad * 0.35,
+          y - rad * 0.35,
+          rad * 0.1,
+          x,
+          y,
+          rad,
+        );
+        if (v === BLACK) {
+          g.addColorStop(0, '#5a5a5a');
+          g.addColorStop(1, '#0a0a0a');
+        } else {
+          g.addColorStop(0, '#ffffff');
+          g.addColorStop(1, '#c8c5bd');
+        }
         const isDead = dead?.has(p) ?? false;
         ctx.save();
-        if (isDead) ctx.globalAlpha = 0.32;   // 死石は薄く
+        if (isDead) ctx.globalAlpha = 0.32; // 死石は薄く
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, rad, 0, Math.PI * 2);
@@ -121,10 +159,12 @@ export function Board({ size, stones, lastMove, onPlay, disabled,
           ctx.lineWidth = Math.max(1.6, css / 260);
           const d = rad * 0.55;
           ctx.beginPath();
-          ctx.moveTo(x - d, y - d); ctx.lineTo(x + d, y + d);
-          ctx.moveTo(x + d, y - d); ctx.lineTo(x - d, y + d);
+          ctx.moveTo(x - d, y - d);
+          ctx.lineTo(x + d, y + d);
+          ctx.moveTo(x + d, y - d);
+          ctx.lineTo(x - d, y + d);
           ctx.stroke();
-          continue;   // 死石には最終手マークを出さない
+          continue; // 死石には最終手マークを出さない
         }
 
         if (p === lastMove) {
@@ -144,13 +184,16 @@ export function Board({ size, stones, lastMove, onPlay, disabled,
           const x = pad + (c.move % size) * gap;
           const y = pad + Math.floor(c.move / size) * gap;
           ctx.fillStyle = `rgba(30,110,200,${0.18 + c.weight * 0.5})`;
-          ctx.beginPath(); ctx.arc(x, y, r2, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x, y, r2, 0, Math.PI * 2);
+          ctx.fill();
           ctx.strokeStyle = 'rgba(20,80,160,.9)';
           ctx.lineWidth = Math.max(1, css / 420);
           ctx.stroke();
           ctx.fillStyle = '#fff';
           ctx.font = `${Math.max(8, gap * 0.34)}px system-ui, sans-serif`;
-          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
           ctx.fillText(c.label, x, y);
         }
       }
@@ -192,7 +235,10 @@ export function Board({ size, stones, lastMove, onPlay, disabled,
       ref={ref}
       onClick={handleClick}
       style={{
-        width: '100%', aspectRatio: '1', display: 'block', borderRadius: 6,
+        width: '100%',
+        aspectRatio: '1',
+        display: 'block',
+        borderRadius: 6,
         cursor: disabled ? 'default' : 'pointer',
         boxShadow: '0 2px 14px rgba(0,0,0,.18)',
       }}

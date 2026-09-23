@@ -1,0 +1,49 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# 仮想環境は名前が人によって違う。site-packages を走査すると数万件出る。
+exclude = [".venv", "venv", ".v", "env", ".env", "models", "games"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort（import 順）
+    "UP",       # pyupgrade（古い書き方の検出）
+    "B",        # bugbear（よくあるバグ）
+    "SIM",      # 冗長な書き方
+    "RUF",      # ruff 固有
+]
+ignore = [
+    # 日本語コメントが多く、全角文字の幅計算で誤検出するため長さは line-length に任せる
+    "E501",
+    # ループ変数を使わない内包表記などは意図的に書いている箇所がある
+    "B007",
+    # 全角の括弧・コロン等を「ASCII と紛らわしい」と警告するルール。
+    # コメントもドキュメントも日本語で書く方針なので、全部誤検知になる（実測158件）。
+    "RUF001", "RUF002", "RUF003",
+    # 密な数値コードでは1行に詰めた方が読みやすい箇所がある。
+    # goban.py の近傍列挙（4方向を縦に揃える）や `e = exp(x); p = e / e.sum()` など。
+    "E701", "E702",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# テストは assert の多用と長い行を許す
+"tests/*" = ["E402"]
+# スクリプトは sys.path 操作のあとに import する必要がある
+"scripts/*" = ["E402"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["*.py", "scripts", "tests"]
+exclude = "(\\.venv|venv|\\.v|env|models|games)"
+# 段階的に厳しくする。まずは「型を書いた箇所が正しいか」だけ見る。
+# 外部ライブラリのスタブが無いものは無視する（onnxruntime 等）。
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

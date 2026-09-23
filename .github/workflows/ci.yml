@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # 手動実行。モデルを使う検証を足したくなったとき用
+  workflow_dispatch:
+
+# 同じブランチへの連続 push では古い実行を打ち切る
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: engine (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Dockerfile と揃える。onnxruntime は 3.14 の wheel が無い
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: engine/requirements-dev.txt
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: ruff (lint)
+        run: ruff check .
+
+      - name: mypy (型)
+        run: mypy .
+
+      - name: pytest
+        # テストはモデルを要らない（盤ルールと棋譜パースのみ）。
+        # 147MB の model.onnx を落とさずに済むので CI が速い。
+        run: pytest
+
+  web:
+    name: web (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: tsc (型)
+        run: npm run typecheck
+
+      - name: eslint
+        run: npm run lint
+
+      - name: prettier
+        run: npm run format:check
+
+      - name: vitest
+        run: npm test

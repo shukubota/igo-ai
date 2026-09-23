@@ -1,0 +1,48 @@
+{
+  // venv は engine/ の下にあるので、ルートを開くと自動検出されない。
+  // これが無いと Pylance が numpy や onnxruntime を解決できない。
+  "python.defaultInterpreterPath": "${workspaceFolder}/engine/.venv/bin/python",
+
+  // engine 内は `from goban import Board` のようにディレクトリ相対で import する
+  // （Dockerfile が *.py を /app 直下に置くため）。ルートから見ると解決できないので、
+  // engine/ を検索パスに追加する。
+  "python.analysis.extraPaths": ["${workspaceFolder}/engine"],
+  "python.analysis.typeCheckingMode": "standard",
+
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}/engine",
+
+  // 保存時に ruff で整形しない。密な数値コードの手動整列を崩すため（CI でも強制しない）。
+  // import 順の修正だけは安全なので有効にする。
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": false,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "editor.formatOnSave": true,
+
+  "eslint.workingDirectories": ["web"],
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true
+  },
+  "search.exclude": {
+    "engine/.venv": true,
+    "engine/models": true,
+    "engine/games": true,
+    "web/node_modules": true,
+    "web/dist": true
+  }
+}

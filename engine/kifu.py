@@ -15,7 +15,7 @@ import json
 import re
 import urllib.error
 import urllib.request
-from typing import Any, Literal
+from typing import Any
 
 BLACK, WHITE = 1, 2
 PASS = -1

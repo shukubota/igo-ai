@@ -3,11 +3,13 @@
 ⚠️ web/src/goban/rules.test.ts と同じケースを維持すること。
    両実装が食い違ったらすぐ分かるようにするため。
 """
-import os, sys
+import os
+import sys
+
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from goban import Board, BLACK, WHITE, EMPTY, PASS  # noqa: E402
+from goban import BLACK, EMPTY, PASS, WHITE, Board
 
 
 def test_single_capture():

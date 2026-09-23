@@ -14,22 +14,25 @@ CPUで探索を成立させるための工夫が3つ入っている:
 ままにしたかったため。対局セッションを持たせるなら、ここが次の高速化ポイント。
 """
 from __future__ import annotations
-import math, time
+
+import math
+import time
+
 import numpy as np
 
-from goban import Board, PASS, opponent
 import features as F
+from goban import PASS, Board
 
 
 class Node:
-    __slots__ = ("moves", "P", "N", "W", "children", "is_expanded", "n_total")
+    __slots__ = ("N", "P", "W", "children", "is_expanded", "moves", "n_total")
 
     def __init__(self, moves: np.ndarray, priors: np.ndarray):
         self.moves = moves                                  # 候補手（盤上index, n=パス）
         self.P = priors.astype(np.float32)                  # 事前確率
         self.N = np.zeros(len(moves), dtype=np.int32)       # 訪問回数
         self.W = np.zeros(len(moves), dtype=np.float32)     # 価値の累計（親手番視点）
-        self.children: list["Node | None"] = [None] * len(moves)
+        self.children: list[Node | None] = [None] * len(moves)
         self.is_expanded = True
         self.n_total = 0
 
@@ -64,7 +67,7 @@ class MCTS:
 
         out = self.sess.run(None, {"bin_input": bin_in, "global_input": glob_in})
         names = [o.name for o in self.sess.get_outputs()]
-        res = dict(zip(names, out))
+        res = dict(zip(names, out, strict=True))
         self.nn_calls += 1
         self.nn_positions += len(boards)
 
@@ -100,7 +103,8 @@ class MCTS:
             pending = []   # (path, board)
             want = min(self.batch_size, visits - done)
             for _ in range(want):
-                node, board, path = root, root_board.copy(), []
+                path: list[tuple[Node, int]] = []
+                node, board = root, root_board.copy()
                 while len(path) < 80:
                     a = int(np.argmax(node.puct(self.c_puct)))
                     path.append((node, a))
@@ -121,7 +125,7 @@ class MCTS:
 
             # --- まとめて評価して展開・バックアップ ---
             evals = self._evaluate_batch([b for _, b in pending])
-            for (path, _board), (cp, cmoves, cvalue) in zip(pending, evals):
+            for (path, _board), (cp, cmoves, cvalue) in zip(pending, evals, strict=True):
                 leaf_parent, a = path[-1]
                 if leaf_parent.children[a] is None:
                     leaf_parent.children[a] = Node(cmoves, cp)

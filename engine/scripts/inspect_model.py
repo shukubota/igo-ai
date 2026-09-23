@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """モデルの実際の入出力名・shapeを表示し、CPUでの推論時間を実測する。
 デプロイ前に必ずこれを走らせて features.py の前提と一致するか確認すること。"""
-import sys, time, numpy as np, onnxruntime as ort
+import sys
+import time
+
+import numpy as np
+import onnxruntime as ort
 
 path = sys.argv[1] if len(sys.argv) > 1 else "models/model.onnx"
 threads = int(sys.argv[2]) if len(sys.argv) > 2 else 2
@@ -60,5 +64,5 @@ for _ in range(N):
 ms = (time.perf_counter() - t) / N * 1000
 print(f"\n== benchmark ==\n  {ms:.0f} ms / position  ({1000/ms:.1f} evals/sec, {threads} threads, {board}x{board})")
 print("\n== output shapes (actual) ==")
-for o, v in zip(s.get_outputs(), outs):
+for o, v in zip(s.get_outputs(), outs, strict=True):
     print(f"  {o.name:16s} {np.asarray(v).shape}")

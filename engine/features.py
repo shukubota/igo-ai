@@ -24,9 +24,12 @@ fillRowV7 出力とバイト一致することを確認すること。
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 from __future__ import annotations
+
 import math
+
 import numpy as np
-from goban import Board, EMPTY, BLACK, WHITE, PASS, opponent
+
+from goban import EMPTY, PASS, WHITE, Board, opponent
 
 NUM_BIN = 22
 NUM_GLOBAL = 19

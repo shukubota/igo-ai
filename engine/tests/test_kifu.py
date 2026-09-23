@@ -5,8 +5,13 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from kifu import (  # noqa: E402
-    BLACK, PASS, WHITE, KifuError, extract_goquest_id, parse_goquest,
+from kifu import (
+    BLACK,
+    PASS,
+    WHITE,
+    KifuError,
+    extract_goquest_id,
+    parse_goquest,
 )
 
 

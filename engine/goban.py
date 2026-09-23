@@ -1,5 +1,6 @@
 """囲碁のルールエンジン（純Python + numpy）。ニューラルネットとは独立。"""
 from __future__ import annotations
+
 import numpy as np
 
 EMPTY, BLACK, WHITE = 0, 1, 2
@@ -154,7 +155,7 @@ class Board:
         self.to_move = opp
 
     # --- 変換 ----------------------------------------------------------------
-    def copy(self) -> "Board":
+    def copy(self) -> Board:
         b = Board(self.size)
         b.stones = self.stones.copy()
         b.ko = self.ko
@@ -164,7 +165,7 @@ class Board:
         return b
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Board":
+    def from_dict(cls, d: dict) -> Board:
         """{"size":19,"stones":[0|1|2,...],"to_move":1,"history":[...],"ko":-1}"""
         b = cls(int(d.get("size", 19)))
         st = d.get("stones")

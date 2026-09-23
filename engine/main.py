@@ -3,17 +3,22 @@
 探索（MCTS）は行わない。1リクエスト = 1推論。
 """
 from __future__ import annotations
-import os, time, logging, threading
+
+import logging
+import os
+import threading
+import time
+
 import numpy as np
 import onnxruntime as ort
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from goban import Board, PASS
-from mcts import MCTS
 import features as F
 import kifu
+from goban import PASS, Board
+from mcts import MCTS
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("goai")
@@ -84,7 +89,7 @@ def _run(board: Board, komi: float):
                           "global_input": glob_in.astype(dt, copy=False)})
     ms = (time.perf_counter() - t) * 1000.0
     names = [o.name for o in sess.get_outputs()]
-    return dict(zip(names, out)), ms
+    return dict(zip(names, out, strict=True)), ms
 
 
 @app.get("/health")
@@ -92,7 +97,7 @@ def health():
     return {"ok": True, "threads": THREADS, "model": os.path.basename(MODEL_PATH)}
 
 
-def _genmove_search(board: Board, pos: "Position"):
+def _genmove_search(board: Board, pos: Position):
     """MCTSで着手を決める。"""
     engine = MCTS(get_session(), c_puct=pos.c_puct, top_k=pos.search_top_k,
                   batch_size=pos.batch_size, komi=pos.komi)
@@ -129,7 +134,7 @@ def genmove(pos: Position):
     try:
         board = Board.from_dict(pos.model_dump())
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
     if pos.visits > 1:
         return _genmove_search(board, pos)
@@ -149,7 +154,7 @@ def genmove(pos: Position):
         move = int(np.random.choice(len(p), p=p))
 
     value = np.asarray(res["value"])[0].astype(np.float64)
-    e = np.exp(value - value.max()); wld = e / e.sum()
+    ev = np.exp(value - value.max()); wld = ev / ev.sum()
 
     body = {
         "move": PASS if move == board.n else move,
@@ -189,7 +194,7 @@ def import_kifu(body: KifuImport):
     except kifu.KifuError as e:
         # 入力が悪いのか先方が落ちているのか区別できないので 400 に寄せる。
         # どちらにせよユーザーに見せるのは同じ文言になる。
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @app.post("/analyze")
@@ -198,7 +203,7 @@ def analyze(pos: Position):
     board = Board.from_dict(pos.model_dump())
     res, ms = _run(board, pos.komi)
     value = np.asarray(res["value"])[0].astype(np.float64)
-    e = np.exp(value - value.max()); wld = e / e.sum()
+    ev = np.exp(value - value.max()); wld = ev / ev.sum()
     body = {
         "winrate": float(wld[0]),
         "loss": float(wld[1]),

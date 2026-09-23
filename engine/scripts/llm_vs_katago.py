@@ -21,13 +21,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import numpy as np  # noqa: E402
-import onnxruntime as ort  # noqa: E402
+import numpy as np
+import onnxruntime as ort
 
-import features as F  # noqa: E402
-import llm_player as LP  # noqa: E402
-from goban import BLACK, PASS, WHITE, Board  # noqa: E402
-from mcts import MCTS  # noqa: E402
+import features as F
+import llm_player as LP
+from goban import BLACK, PASS, WHITE, Board
+from mcts import MCTS
 
 
 def katago_move(sess, board: Board, *, komi: float, visits: int, top_k: int) -> tuple[int, float]:
@@ -38,7 +38,7 @@ def katago_move(sess, board: Board, *, komi: float, visits: int, top_k: int) -> 
         dt = F.input_dtype(sess)
         out = sess.run(None, {"bin_input": bin_in.astype(dt, copy=False),
                               "global_input": glob_in.astype(dt, copy=False)})
-        res = dict(zip([o.name for o in sess.get_outputs()], out))
+        res = dict(zip([o.name for o in sess.get_outputs()], out, strict=True))
         policy = np.asarray(res["policy"])[0, 0].astype(np.float64)
         probs = F.softmax_masked(policy, board.legal_mask())
         value = np.asarray(res["value"])[0].astype(np.float64)

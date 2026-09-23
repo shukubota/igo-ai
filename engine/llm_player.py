@@ -24,7 +24,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 
-from goban import Board, BLACK, EMPTY, PASS, WHITE
+from goban import BLACK, EMPTY, PASS, WHITE, Board
 
 MODEL = "claude-opus-5"
 
@@ -198,8 +198,9 @@ def _call_claude(system: str, prompt: str, model: str, timeout_s: int = 300
         raise RuntimeError(f"claude -p が失敗しました: {proc.stderr.strip()[:300]}")
     try:
         doc = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        raise RuntimeError(f"claude -p の出力が JSON ではありません: {proc.stdout[:300]}")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"claude -p の出力が JSON ではありません: {proc.stdout[:300]}") from e
     if doc.get("is_error"):
         raise RuntimeError(f"claude -p がエラーを返しました: {doc.get('result')}")
     return str(doc.get("result", "")), doc.get("usage") or {}

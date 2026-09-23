@@ -2,6 +2,9 @@
 engine/models/*.onnx
 engine/models/*.bin
 
+# LLM 対局の棋譜。実行のたびに増えるので追跡しない
+engine/games/
+
 # Python
 __pycache__/
 *.py[cod]
